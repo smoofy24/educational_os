@@ -27,13 +27,47 @@ vilik/
 
 ## Requirements
 
-- ARM toolchain (arm-none-eabi-gcc)
-- QEMU for ARM emulation (qemu-system-arm)
-- Make or CMake for build system
+### Toolchain
+- **aarch64-elf-gcc** (AArch64 bare-metal toolchain)
+- **QEMU** for ARM emulation (qemu-system-aarch64)
+- **Make** build system
+
+### Installation
+
+#### macOS (Homebrew)
+```bash
+brew install aarch64-elf-gcc
+brew install qemu
+```
+
+#### Linux (Ubuntu/Debian)
+```bash
+sudo apt-get install gcc-aarch64-linux-gnu
+sudo apt-get install qemu-system-arm
+```
+
+#### Arch Linux
+```bash
+sudo pacman -S aarch64-linux-gnu-gcc qemu-arch-extra
+```
 
 ## Build
 
-_(To be added as the project develops)_
+```bash
+# Build the kernel
+make
+
+# Run in QEMU
+make run
+
+# Clean build artifacts
+make clean
+```
+
+The build produces `kernel.elf` which can be executed in QEMU with:
+```bash
+qemu-system-aarch64 -M virt -cpu cortex-a53 -m 256M -nographic -kernel kernel.elf
+```
 
 ## Development
 
