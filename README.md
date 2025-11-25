@@ -75,7 +75,7 @@ The project is developed incrementally with emphasis on understanding each compo
 
 ## License
 
-_(To be determined)_
+BSD 3-Clause License - see project for details.
 
 ## Notes
 
