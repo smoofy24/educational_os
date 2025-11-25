@@ -1,11 +1,23 @@
     .section .text
     .global _start
-
- _start:
+    
+_start:
     ldr x0, =__stack_top
     mov sp, x0
+
+    // Zero out the .bss section
+    ldr x0, =__bss_start
+    ldr x1, =__bss_end
+
+zero_bss:
+    cmp x0, x1
+    b.ge done_bss
+    str xzr, [x0], #8
+    b zero_bss
+
+done_bss:
     bl kernel_main
 
- 1:
+1:
     wfe
     b 1b

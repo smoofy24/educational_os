@@ -139,6 +139,18 @@ Here's our complete `boot.S` with detailed explanations:
 _start:
     ldr x0, =__stack_top
     mov sp, x0
+
+    // Zero out the .bss section
+    ldr x0, =__bss_start
+    ldr x1, =__bss_end
+
+zero_bss:
+    cmp x0, x1
+    b.ge done_bss
+    str xzr, [x0], #8
+    b zero_bss
+
+done_bss:
     bl kernel_main
 
 1:
@@ -146,8 +158,8 @@ _start:
     b 1b
 ```
 
-That's it! Just 11 lines. The stack memory is allocated in the linker script
-(see next section), not here. Let's break it down:
+The stack memory is allocated in the linker script (see next section), not here.
+Let's break it down:
 
 ### Section Declaration
 
@@ -236,6 +248,81 @@ Stack layout in memory (defined in linker.ld):
 Note: ARM stack grows DOWNWARD (from high to low addresses)
       So we start SP at the TOP of our allocated space
 ```
+
+### Zeroing the BSS Section
+
+```asm
+    ldr x0, =__bss_start
+    ldr x1, =__bss_end
+
+zero_bss:
+    cmp x0, x1
+    b.ge done_bss
+    str xzr, [x0], #8
+    b zero_bss
+
+done_bss:
+```
+
+**Why we need this**: The C standard says uninitialized global variables must
+be zero. The `.bss` section holds these variables, but it's just reserved
+space - no actual zeros are stored in the ELF file.
+
+```
+int initialized = 42;    // → .data section (value stored in ELF)
+int uninitialized;       // → .bss section (must be zeroed at runtime)
+```
+
+QEMU zeros RAM for us, but real hardware has garbage in memory at boot.
+This loop ensures `.bss` is zeroed regardless of environment.
+
+**How it works**:
+
+```
+__bss_start                              __bss_end
+     │                                        │
+     ▼                                        ▼
+┌────┬────┬────┬────┬────┬────┬────┬────┬────┐
+│ ?? │ ?? │ ?? │ ?? │ ?? │ ?? │ ?? │ ?? │    │  Before
+└────┴────┴────┴────┴────┴────┴────┴────┴────┘
+
+     x0 (moves right by 8 bytes each iteration)
+     │
+     ▼
+┌────┬────┬────┬────┬────┬────┬────┬────┬────┐
+│ 00 │ 00 │ 00 │ ?? │ ?? │ ?? │ ?? │ ?? │    │  During
+└────┴────┴────┴────┴────┴────┴────┴────┴────┘
+
+┌────┬────┬────┬────┬────┬────┬────┬────┬────┐
+│ 00 │ 00 │ 00 │ 00 │ 00 │ 00 │ 00 │ 00 │    │  After
+└────┴────┴────┴────┴────┴────┴────┴────┴────┘
+```
+
+**Instruction breakdown**:
+
+| Instruction | Meaning |
+|-------------|---------|
+| `ldr x0, =__bss_start` | x0 = start address of BSS |
+| `ldr x1, =__bss_end` | x1 = end address of BSS |
+| `cmp x0, x1` | Compare: are we past the end? |
+| `b.ge done_bss` | If x0 >= x1, we're done, skip ahead |
+| `str xzr, [x0], #8` | Store 8 zero bytes at [x0], then x0 += 8 |
+| `b zero_bss` | Loop back |
+
+**The `str xzr, [x0], #8` instruction**:
+
+This does three things in one instruction:
+1. `str` - store register to memory
+2. `xzr` - the zero register (always reads as 0)
+3. `[x0], #8` - post-increment: write to address in x0, then add 8 to x0
+
+```
+Before: x0 = 0x40001000, memory[0x40001000] = garbage
+After:  x0 = 0x40001008, memory[0x40001000] = 0x0000000000000000
+```
+
+We use 8-byte stores (64-bit) for efficiency. The BSS section must be
+8-byte aligned (our linker script ensures this).
 
 ### Calling the Kernel
 
@@ -502,6 +589,14 @@ What happens from power-on to your kernel code:
                                   │
                                   ▼
 ┌─────────────────────────────────────────────────────────────────────┐
+│  Zero BSS section                                                   │
+│                                                                     │
+│  Loop from __bss_start to __bss_end, writing zeros.                 │
+│  Ensures uninitialized globals are 0 (C standard requirement).      │
+└─────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+┌─────────────────────────────────────────────────────────────────────┐
 │  bl kernel_main                                                     │
 │                                                                     │
 │  Jump to C code! The "real" OS starts here.                        │
@@ -551,23 +646,7 @@ secondary:
     b secondary
 ```
 
-### 2. BSS Zeroing
-
-The `.bss` section should contain zeros. QEMU does this for us, but real
-hardware might have garbage in RAM. Safe bootloader would:
-
-```asm
-    ldr x0, =__bss_start
-    ldr x1, =__bss_end
-zero_bss:
-    cmp x0, x1
-    b.ge done_bss
-    str xzr, [x0], #8      // Store zero, increment pointer
-    b zero_bss
-done_bss:
-```
-
-### 3. Exception Level Setup
+### 2. Exception Level Setup
 
 ARM64 has 4 exception levels (EL0-EL3). QEMU starts us at EL1, but real
 hardware might start at EL2 or EL3. A complete bootloader would:
@@ -576,7 +655,7 @@ hardware might start at EL2 or EL3. A complete bootloader would:
 - Configure each level appropriately
 - Drop down to EL1 for the kernel
 
-### 4. Memory Configuration
+### 3. Memory Configuration
 
 No MMU setup, no memory protection. All memory is accessible from anywhere -
 a bug could overwrite kernel code. Future work:
