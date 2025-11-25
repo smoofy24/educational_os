@@ -1,0 +1,2 @@
+-Ikernel/include
+-std=gnu11

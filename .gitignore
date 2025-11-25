@@ -1,0 +1,49 @@
+# Compiled object files
+*.o
+*.obj
+*.ko
+*.elf
+
+# Compiled binaries
+*.bin
+*.img
+*.iso
+
+# Linker output
+*.map
+*.sym
+
+# Libraries
+*.a
+*.lib
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# Build directories
+build/
+bin/
+obj/
+out/
+
+# Editor and IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Toolchain generated files
+*.d
+*.lst
+
+# QEMU logs
+qemu.log
+
+# Core dumps
+core
+vgcore.*
