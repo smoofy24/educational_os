@@ -7,7 +7,7 @@
 #define UART_FR_TXFF (1 << 5)
 
 void uart_putc(char c) {
-    while (UART_FR & UART_FR_TXFF); {
+    while (UART_FR & UART_FR_TXFF) {
         // Wait until the transmit FIFO is not full
     }
 
