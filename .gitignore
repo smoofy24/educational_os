@@ -40,6 +40,9 @@ out/
 .vimrc
 Session.vim
 
+# Claude Code configuration (personal)
+.claude/
+
 # Toolchain generated files
 *.d
 *.lst
