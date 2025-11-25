@@ -1,9 +1,11 @@
 ENTRY(_start)
 
+KERNEL_STACK_SIZE = 0x4000;
+
 SECTIONS
 {
     . = 0x40000000;
-    __kernel_start = .
+    __kernel_start = .;
 
     .text : {
         *(.text*)
@@ -22,8 +24,14 @@ SECTIONS
         *(.bss*)
         *(COMMON)
         __bss_end = .; 
-
     }
 
-    __kernel_end = .
+    .stack (NOLOAD) : {
+        . = ALIGN(16);
+        __stack_bottom = .;
+        . += KERNEL_STACK_SIZE;
+        __stack_top = .;
+    }
+
+    __kernel_end = .;
 }
