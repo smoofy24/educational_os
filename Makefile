@@ -1,7 +1,7 @@
 CROSS = aarch64-elf-
 CC    = $(CROSS)gcc
 
-CFLAGS  = -ffreestanding -nostdlib -nostartfiles -Ikernel/include
+CFLAGS  = -ffreestanding -nostdlib -nostartfiles -Ikernel/include 
 LDFLAGS = -T linker.ld -nostdlib
 
 SRC := $(shell find kernel/src -name '*.c')
@@ -22,5 +22,10 @@ run: kernel.elf
 	qemu-system-aarch64 -M virt -cpu cortex-a53 -m 256M -nographic \
 		-kernel kernel.elf
 
+debug: kernel.elf
+	qemu-system-aarch64 -M virt -cpu cortex-a53 -m 256M -nographic \
+		-kernel kernel.elf -serial mon:stdio
+
 clean:
-	rm -f boot/*.o kernel.elf
+	rm -f kernel.elf $(OBJ) boot/boot.o
+	find kernel/src -name '*.o' -delete
