@@ -1,8 +1,15 @@
 CROSS = aarch64-elf-
 CC    = $(CROSS)gcc
 
-CFLAGS  = -ffreestanding -nostdlib -nostartfiles -Ikernel/include 
+CFLAGS  = -ffreestanding -nostdlib -nostartfiles -Ikernel/include
 LDFLAGS = -T linker.ld -nostdlib
+
+# Debug build: make DEBUG=1
+ifdef DEBUG
+    CFLAGS += -DDEBUG -g -O0
+else
+    CFLAGS += -O2
+endif
 
 SRC := $(shell find kernel/src -name '*.c')
 OBJ := $(SRC:.c=.o)

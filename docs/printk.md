@@ -199,11 +199,29 @@ printk("Addr: %lx\n", addr);
 For structured logging with visual distinction, use the log level macros defined in `lib/printk.h`:
 
 ```c
-LOG_ERROR(fmt, ...)   // Red "[ERROR]" prefix
-LOG_WARN(fmt, ...)    // Yellow "[WARN]" prefix
-LOG_INFO(fmt, ...)    // Plain "[INFO]" prefix (no color)
-LOG_DEBUG(fmt, ...)   // Cyan "[DEBUG]" prefix
+LOG_ERROR(fmt, ...)   // Red "[ERROR]" prefix - always enabled
+LOG_WARN(fmt, ...)    // Yellow "[WARN]" prefix - always enabled
+LOG_INFO(fmt, ...)    // Plain "[INFO]" prefix (no color) - always enabled
+LOG_DEBUG(fmt, ...)   // Cyan "[DEBUG]" prefix - only in debug builds
 ```
+
+### Enabling Debug Logs
+
+`LOG_DEBUG` is **disabled by default** to reduce code size and noise in release builds.
+
+To enable debug logs, build with the `DEBUG` flag:
+
+```bash
+# Release build (LOG_DEBUG disabled)
+make clean && make
+
+# Debug build (LOG_DEBUG enabled + debug symbols)
+make clean && make DEBUG=1
+```
+
+The debug build also adds:
+- `-g` flag for GDB debug symbols
+- `-O0` to disable optimizations (easier debugging)
 
 ### Usage
 
@@ -211,14 +229,14 @@ LOG_DEBUG(fmt, ...)   // Cyan "[DEBUG]" prefix
 LOG_INFO("System initialized\n");
 LOG_WARN("Memory low: %d bytes remaining\n", free_mem);
 LOG_ERROR("Failed to allocate %d bytes\n", size);
-LOG_DEBUG("Entering function at %p\n", func_ptr);
+LOG_DEBUG("Entering function at %p\n", func_ptr);  // Only in DEBUG builds
 ```
 
 ### Terminal Output
 
 ```
-[INFO] System initialized
-[WARN] Memory low: 1024 bytes remaining
+[INFO]  System initialized
+[WARN]  Memory low: 1024 bytes remaining
 [ERROR] Failed to allocate 4096 bytes
 [DEBUG] Entering function at 0x0000000040002000
 ```
@@ -227,7 +245,7 @@ With color support:
 - `[ERROR]` appears in red
 - `[WARN]` appears in yellow
 - `[INFO]` has no color (white/default)
-- `[DEBUG]` appears in cyan
+- `[DEBUG]` appears in cyan (only with `DEBUG=1`)
 
 ---
 
