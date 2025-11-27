@@ -199,10 +199,10 @@ printk("Addr: %lx\n", addr);
 For structured logging with visual distinction, use the log level macros defined in `lib/printk.h`:
 
 ```c
-LOG_ERROR(fmt, ...)   // Red "[ERROR] " prefix
-LOG_WARN(fmt, ...)    // Yellow "[WARN] " prefix
-LOG_INFO(fmt, ...)    // Cyan "[INFO] " prefix
-LOG_DEBUG(fmt, ...)   // Plain "[DEBUG] " prefix
+LOG_ERROR(fmt, ...)   // Red "[ERROR]" prefix
+LOG_WARN(fmt, ...)    // Yellow "[WARN]" prefix
+LOG_INFO(fmt, ...)    // Plain "[INFO]" prefix (no color)
+LOG_DEBUG(fmt, ...)   // Cyan "[DEBUG]" prefix
 ```
 
 ### Usage
@@ -226,8 +226,8 @@ LOG_DEBUG("Entering function at %p\n", func_ptr);
 With color support:
 - `[ERROR]` appears in red
 - `[WARN]` appears in yellow
-- `[INFO]` appears in cyan
-- `[DEBUG]` has no color
+- `[INFO]` has no color (white/default)
+- `[DEBUG]` appears in cyan
 
 ---
 
