@@ -2,8 +2,11 @@
     .global _start
     
 _start:
+    mov x19, x0  // Preserve the first argument (DTB address)
+
     ldr x0, =__stack_top
     mov sp, x0
+
 
     // Initialize Floating Point Unit (FPU)
     mrs x0, cpacr_el1
@@ -22,8 +25,16 @@ zero_bss:
     b zero_bss
 
 done_bss:
+    ldr x1, =dtb_address
+    str x19, [x1]
+
     bl kernel_main
 
 1:
     wfe
     b 1b
+
+.section .bss
+.global dtb_address
+dtb_address:
+    .quad 0

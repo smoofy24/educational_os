@@ -149,47 +149,90 @@ pl031@9010000 {
 
 ## How QEMU Passes DTB
 
-When QEMU starts the kernel, it:
+### Important Note: Bare-metal ELF vs Linux Kernel
 
-1. Loads kernel at `0x40000000`
-2. Generates DTB and places it in memory
-3. Passes DTB address in register `x0`
+QEMU's behavior differs depending on what you're loading:
+
+| Scenario | DTB Behavior |
+|----------|--------------|
+| Linux kernel (Image) | QEMU passes DTB address in `x0` |
+| Bare-metal ELF (-kernel) | QEMU does **NOT** pass DTB in `x0` |
+
+For bare-metal ELF kernels (like ours), we must **explicitly load the DTB**
+using QEMU's `-device loader` option.
+
+### Our Approach: Explicit DTB Loading
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                     Memory Layout                        │
 ├─────────────────────────────────────────────────────────┤
-│  0x40000000  │  Kernel image                            │
+│  0x40080000  │  Kernel image (our ELF)                  │
 │  ...         │                                          │
-│  0x4????000  │  DTB (placed by QEMU)                    │
+│  0x48000000  │  DTB (loaded via -device loader)         │
 │  ...         │                                          │
 │  0x50000000  │  End of RAM (with -m 256M)               │
 └─────────────────────────────────────────────────────────┘
-
-On entry:
-  x0 = DTB address
-  x1 = 0
-  x2 = 0
-  x3 = 0
-  PC = 0x40000000 (kernel entry)
 ```
 
+### Generating and Loading DTB
+
+The Makefile handles DTB generation and loading automatically:
+
+```makefile
+DTB_FILE = virt.dtb
+DTB_ADDR = 0x48000000
+
+# Generate DTB from QEMU's virt machine definition
+$(DTB_FILE):
+	qemu-system-aarch64 -M virt -cpu cortex-a53 -m 256M -machine dumpdtb=$(DTB_FILE)
+
+# Run with explicit DTB loading
+run: kernel.elf $(DTB_FILE)
+	qemu-system-aarch64 -M virt -cpu cortex-a53 -m 256M -nographic \
+		-kernel kernel.elf \
+		-device loader,file=$(DTB_FILE),addr=$(DTB_ADDR),force-raw=on
+```
+
+Key points:
+- `dumpdtb=virt.dtb` - Extract QEMU's generated DTB to a file
+- `-device loader,file=...,addr=...,force-raw=on` - Load raw binary at specific address
+- `force-raw=on` - Treat file as raw binary, not ELF
+
 ### Saving DTB Address in boot.S
+
+Since we know the DTB address at compile time (0x48000000), we could hardcode it.
+However, for flexibility, we still save `x0` in case a bootloader passes it:
 
 ```asm
 .global _start
 .global dtb_address
 
 _start:
-    // x0 contains DTB address from QEMU
+    mov x19, x0              // Preserve x0 (might contain DTB from bootloader)
+
+    // ... stack setup, BSS zeroing ...
+
+done_bss:
     ldr x1, =dtb_address
-    str x0, [x1]              // Save DTB address
+    str x19, [x1]            // Save to global variable
 
-    // ... rest of boot code
+    bl kernel_main
 
-.section .data
+.section .bss
 dtb_address:
     .quad 0
+```
+
+In C code, you can then use the known address:
+
+```c
+#define DTB_ADDRESS 0x48000000
+extern uint64_t dtb_address;  // From boot.S (may be 0 for bare-metal)
+
+void *get_dtb(void) {
+    return (void *)DTB_ADDRESS;  // Use known address for our setup
+}
 ```
 
 ---
@@ -316,19 +359,26 @@ if (reg && len >= 16) {
 
 ---
 
-## Implementation Plan
+## Implementation Status
 
-### Phase 1: Save DTB Address
-1. Modify `boot.S` to save `x0` (DTB address) to a global variable
-2. Make it accessible from C code
+### Phase 1: DTB Loading ✅ DONE
+1. ~~Modify `boot.S` to save `x0` (DTB address) to a global variable~~ ✅
+2. ~~Make it accessible from C code~~ ✅
+3. ~~Set up explicit DTB loading via Makefile~~ ✅
 
-### Phase 2: Minimal Parser
+**What we implemented:**
+- `boot.S` saves x0 to `dtb_address` global variable
+- Makefile auto-generates DTB with `dumpdtb`
+- DTB loaded at `0x48000000` via `-device loader`
+- Linker script updated with `.bss (NOLOAD)` for proper operation
+
+### Phase 2: Minimal Parser (TODO)
 1. Create `kernel/src/lib/fdt.c`
 2. Implement header validation
 3. Implement node/property traversal
 4. Handle big-endian to little-endian conversion
 
-### Phase 3: Use DTB Data
+### Phase 3: Use DTB Data (TODO)
 1. Read memory size from `/memory` node
 2. Read UART address from `/pl011@9000000` node
 3. Replace hardcoded values
@@ -338,9 +388,9 @@ if (reg && len >= 16) {
 ```
 kernel/
 ├── include/lib/
-│   └── fdt.h         # FDT parsing functions
+│   └── fdt.h         # FDT parsing functions (TODO)
 └── src/lib/
-    └── fdt.c         # FDT parser implementation
+    └── fdt.c         # FDT parser implementation (TODO)
 ```
 
 ---

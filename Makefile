@@ -18,14 +18,23 @@ boot/boot.o: boot/boot.S
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-run: kernel.elf
-	qemu-system-aarch64 -M virt -cpu cortex-a53 -m 256M -nographic \
-		-kernel kernel.elf
+DTB_FILE = virt.dtb
+DTB_ADDR = 0x48000000
 
-debug: kernel.elf
+$(DTB_FILE):
+	qemu-system-aarch64 -M virt -cpu cortex-a53 -m 256M -machine dumpdtb=$(DTB_FILE)
+
+run: kernel.elf $(DTB_FILE)
 	qemu-system-aarch64 -M virt -cpu cortex-a53 -m 256M -nographic \
-		-kernel kernel.elf -serial mon:stdio
+		-kernel kernel.elf \
+		-device loader,file=$(DTB_FILE),addr=$(DTB_ADDR),force-raw=on
+
+debug: kernel.elf $(DTB_FILE)
+	qemu-system-aarch64 -M virt -cpu cortex-a53 -m 256M -nographic \
+		-kernel kernel.elf \
+		-device loader,file=$(DTB_FILE),addr=$(DTB_ADDR),force-raw=on \
+		-serial mon:stdio
 
 clean:
-	rm -f kernel.elf $(OBJ) boot/boot.o
+	rm -f kernel.elf $(OBJ) boot/boot.o $(DTB_FILE)
 	find kernel/src -name '*.o' -delete

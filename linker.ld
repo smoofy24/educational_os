@@ -4,7 +4,7 @@ KERNEL_STACK_SIZE = 0x4000;
 
 SECTIONS
 {
-    . = 0x40000000;
+    . = 0x40080000;
     __kernel_start = .;
 
     .text : {
@@ -19,11 +19,13 @@ SECTIONS
         *(.data*)
     }
 
-    .bss : {
+    .bss (NOLOAD) : {
+        . = ALIGN(8);
         __bss_start = .;
         *(.bss*)
         *(COMMON)
-        __bss_end = .; 
+        . = ALIGN(8);
+        __bss_end = .;
     }
 
     .stack (NOLOAD) : {

@@ -137,8 +137,16 @@ Here's our complete `boot.S` with detailed explanations:
     .global _start
 
 _start:
+    mov x19, x0              // Save DTB address (passed by bootloader in x0)
+
     ldr x0, =__stack_top
     mov sp, x0
+
+    // Initialize Floating Point Unit (FPU)
+    mrs x0, cpacr_el1
+    orr x0, x0, #(0b11 << 20)  // Enable FP/SIMD for EL0 and EL1
+    msr cpacr_el1, x0
+    isb
 
     // Zero out the .bss section
     ldr x0, =__bss_start
@@ -151,11 +159,19 @@ zero_bss:
     b zero_bss
 
 done_bss:
+    ldr x1, =dtb_address     // Store DTB address to global variable
+    str x19, [x1]
+
     bl kernel_main
 
 1:
     wfe
     b 1b
+
+.section .bss
+.global dtb_address
+dtb_address:
+    .quad 0
 ```
 
 The stack memory is allocated in the linker script (see next section), not here.
@@ -413,17 +429,19 @@ KERNEL_STACK_SIZE = 0x4000;    /* 16KB - change this one value to resize */
 
 SECTIONS
 {
-    . = 0x40000000;            /* Load address - where QEMU puts us */
+    . = 0x40080000;            /* Load address - offset to leave room for DTB */
     __kernel_start = .;
 
     .text : { *(.text*) }      /* Code */
     .rodata : { *(.rodata*) }  /* Read-only data (strings, constants) */
     .data : { *(.data*) }      /* Initialized globals */
 
-    .bss : {                   /* Uninitialized globals (zeroed) */
+    .bss (NOLOAD) : {          /* Uninitialized globals (zeroed at runtime) */
+        . = ALIGN(8);
         __bss_start = .;
         *(.bss*)
         *(COMMON)
+        . = ALIGN(8);
         __bss_end = .;
     }
 
@@ -440,8 +458,9 @@ SECTIONS
 
 ### Key Concepts
 
-**`. = 0x40000000`** - The "location counter". Sets where the next section
-starts. QEMU's virt machine loads kernels at this address.
+**`. = 0x40080000`** - The "location counter". Sets where the next section
+starts. We use 0x40080000 (not 0x40000000) to leave room for the DTB which
+we load at 0x48000000 via QEMU's `-device loader`.
 
 **`ENTRY(_start)`** - Tells the linker which symbol is the entry point.
 Embedded in the ELF file so loaders know where to jump.
@@ -473,16 +492,17 @@ To change stack size, edit ONE line in `linker.ld`. No assembly changes needed.
 
 ## Memory Layout
 
-Here's how everything fits together when loaded at `0x40000000`:
+Here's how everything fits together when loaded at `0x40080000`:
 
 ```
     Address          Content                         Section
     ────────────────────────────────────────────────────────────
 
-    0x40000000  ┌──────────────────────────────┐
+    0x40080000  ┌──────────────────────────────┐
    __kernel_    │      _start:                 │
-     start      │      ldr x0, =__stack_top    │    .text
-                │      mov sp, x0              │    (code)
+     start      │      mov x19, x0             │    .text
+                │      ldr x0, =__stack_top    │    (code)
+                │      mov sp, x0              │
                 │      bl kernel_main          │
                 │  1:  wfe                     │
                 │      b 1b                    │
